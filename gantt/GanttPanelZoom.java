@@ -2,72 +2,159 @@ package gantt;
 
 import java.awt.*;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.WeekFields;
 import java.util.List;
 import java.util.Locale;
 import javax.swing.*;
 
+/**
+ * Composant JPanel pour afficher un diagramme de Gantt interactif avec support du zoom.
+ * Version refactorisée : les noms des tâches sont séparés du diagramme.
+ */
 public class GanttPanelZoom extends JPanel {
 
-    // Types d’échelles possibles pour l’affichage
-    public enum ScaleType { YEAR, MONTH, WEEK, DAY }
+    public enum ScaleType { 
+        YEAR, MONTH, WEEK, DAY
+    }
 
-    private List<Task> tasks;             // Liste des tâches à afficher
-    private LocalDate projectStart;       // Date du début du projet
-    private LocalDate projectEnd;         // Date de fin du projet
-    private ScaleType scaleType = ScaleType.DAY; // Échelle actuelle
-    private double zoomFactor = 1.0;      // Facteur de zoom
+    private List<Task> tasks;
+    private LocalDate projectStart;
+    private LocalDate projectEnd;
+    private ScaleType scaleType = ScaleType.DAY;
+    private double zoomFactor = 1.0;
 
-    // Dimensions et marges
-    private final int taskHeight = 22;
-    private final int taskSpacing = 14;
-    private final int yOffset = 80;
-    private final int leftMargin = 100;
+    // CONSTANTES DE MISE EN PAGE
+    private static final int TASK_HEIGHT = 22;
+    private static final int TASK_SPACING = 14;
+    private static final int Y_OFFSET = 80;
+    private static final int LEFT_MARGIN = 0; // Pas de marge à gauche (les noms sont ailleurs)
+    private static final int RIGHT_PADDING = 50;
+    private static final int HEADER_HEIGHT = 40;
+    private static final int MIN_TASK_WIDTH = 3;
+    private static final int BORDER_RADIUS = 6;
 
+    // CONSTANTES DE COULEURS
+    private static final Color GRID_COLOR = new Color(200, 200, 200);
+    private static final Color ALTERNATE_BG = new Color(220, 220, 220, 200);
+    private static final Color TASK_BORDER = Color.DARK_GRAY;
+    private static final Color TEXT_COLOR = Color.BLACK;
+
+    // FORMATTEURS DE DATE
+    private static final DateTimeFormatter DAY_FORMATTER = DateTimeFormatter.ofPattern("dd/MM");
+    private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("MMM yyyy");
+
+    /**
+     * Constructeur du panneau Gantt (diagramme uniquement, sans les noms).
+     */
     public GanttPanelZoom(List<Task> tasks) {
+        if (tasks == null || tasks.isEmpty()) {
+            throw new IllegalArgumentException("La liste de tâches ne peut pas être vide");
+        }
+        
         this.tasks = tasks;
+        calculateProjectBounds();
+        setBackground(Color.WHITE);
+    }
 
-        // Définir la date de début minimale
+    private void calculateProjectBounds() {
         projectStart = tasks.stream()
                 .map(Task::getStartDate)
                 .min(LocalDate::compareTo)
                 .orElse(LocalDate.now());
 
-        // Date de fin maximale
         projectEnd = tasks.stream()
                 .map(t -> t.getStartDate().plusDays(t.getDuration()))
                 .max(LocalDate::compareTo)
                 .orElse(projectStart);
-
-        setBackground(Color.WHITE);
     }
 
-    // Modifier l’échelle d’affichage
     public void setScaleType(ScaleType type) {
         this.scaleType = type;
-        revalidate();
         repaint();
     }
 
-    // Largeur de base en fonction de l’échelle + zoom
+    public void setZoomFactor(double factor) {
+        this.zoomFactor = Math.max(0.5, Math.min(factor, 3.0));
+        repaint();
+    }
+
     private double getBaseUnitWidth() {
+        double baseWidth;
         switch (scaleType) {
-            case YEAR: return 50 * zoomFactor;
-            case MONTH: return 40 * zoomFactor;
-            case WEEK: return 20 * zoomFactor;
-            default: return 10 * zoomFactor; // DAY
+            case YEAR:  baseWidth = 50; break;
+            case MONTH: baseWidth = 40; break;
+            case WEEK:  baseWidth = 20; break;
+            default:    baseWidth = 10; break;
+        }
+        return baseWidth * zoomFactor;
+    }
+
+    private Color getColorForPriority(String priority) {
+        if (priority == null) return new Color(128, 128, 128);
+        
+        switch (priority.toLowerCase()) {
+            case "haute":
+            case "élevée":
+            case "high":
+                return new Color(220, 53, 69);
+            case "normale":
+            case "normal":
+            case "medium":
+                return new Color(0, 123, 255);
+            case "basse":
+            case "low":
+                return new Color(40, 167, 69);
+            default:
+                return new Color(128, 128, 128);
         }
     }
 
-    // Couleurs en fonction de la priorité
-    private Color getColorForPriority(String priority) {
-        if (priority == null) return Color.GRAY;
-        switch (priority.toLowerCase()) {
-            case "haute": case "élevée": return Color.RED;
-            case "normale": return Color.BLUE;
-            case "basse": return Color.GREEN.darker();
-            default: return Color.GRAY;
+    private DateRange calculateVisibleRange() {
+        LocalDate start = projectStart;
+        LocalDate end;
+
+        switch (scaleType) {
+            case DAY:
+                end = start.plusWeeks(3);
+                break;
+            case WEEK:
+                end = start.plusMonths(6);
+                while (end.getDayOfWeek().getValue() != 7) {
+                    end = end.plusDays(1);
+                }
+                break;
+            case MONTH:
+                end = start.plusYears(1).withMonth(12).withDayOfMonth(31);
+                break;
+            case YEAR:
+                end = start.plusYears(3).withMonth(12).withDayOfMonth(31);
+                break;
+            default:
+                end = start.plusWeeks(3);
+        }
+
+        return new DateRange(start, end);
+    }
+
+    private long calculateTotalUnits(DateRange range) {
+        switch (scaleType) {
+            case YEAR:
+                return ChronoUnit.YEARS.between(
+                    range.start.withDayOfYear(1), 
+                    range.end.withDayOfYear(1)
+                );
+            case MONTH:
+                return ChronoUnit.MONTHS.between(
+                    range.start.withDayOfMonth(1),
+                    range.end.withDayOfMonth(1)
+                );
+            case WEEK:
+                return ChronoUnit.WEEKS.between(range.start, range.end);
+            default:
+                return ChronoUnit.DAYS.between(range.start, range.end);
         }
     }
 
@@ -76,219 +163,368 @@ public class GanttPanelZoom extends JPanel {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
 
-        // Police lissée
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
 
+        DateRange visibleRange = calculateVisibleRange();
+        long totalUnits = calculateTotalUnits(visibleRange);
+        double unitWidth = calculateAdjustedUnitWidth(totalUnits);
+
+        drawAlternateBackground(g2, totalUnits, unitWidth);
+        drawTimeAxis(g2, visibleRange, totalUnits, unitWidth);
+        drawTasks(g2, visibleRange, unitWidth);
+
+        updatePanelSize(totalUnits, unitWidth);
+    }
+
+    private double calculateAdjustedUnitWidth(long totalUnits) {
         double unitWidth = getBaseUnitWidth();
-
-        // --- Définir la période visible en fonction de l’échelle ---
-        LocalDate visibleStart = projectStart;
-        LocalDate visibleEnd = projectStart;
-
-        switch (scaleType) {
-            case DAY:
-                // Affichage sur ~3 mois
-                visibleEnd = visibleStart.plusMonths(3).withDayOfMonth(visibleStart.plusMonths(3).lengthOfMonth());
-                break;
-
-            case WEEK:
-                // Affichage sur ~6 mois
-                visibleEnd = visibleStart.plusMonths(6);
-                // Ajuster à la fin de semaine
-                while (visibleEnd.getDayOfWeek().getValue() != 7) visibleEnd = visibleEnd.plusDays(1);
-                break;
-
-            case MONTH:
-                // 1 an
-                visibleEnd = visibleStart.plusYears(1).withMonth(12).withDayOfMonth(31);
-                break;
-
-            case YEAR:
-                // 3 ans
-                visibleEnd = visibleStart.plusYears(3).withMonth(12).withDayOfMonth(31);
-                break;
-        }
-
-        // --- Calcul du nombre d’unités en fonction de l’échelle ---
-        long totalUnits;
-        switch (scaleType) {
-            case YEAR:
-                totalUnits = ChronoUnit.YEARS.between(visibleStart.withDayOfYear(1), visibleEnd.withDayOfYear(1)) + 1;
-                break;
-
-            case MONTH:
-                totalUnits = ChronoUnit.MONTHS.between(
-                        LocalDate.of(visibleStart.getYear(), visibleStart.getMonth(), 1),
-                        LocalDate.of(visibleEnd.getYear(), visibleEnd.getMonth(), 1)) + 1;
-                break;
-
-            case WEEK:
-                totalUnits = ChronoUnit.WEEKS.between(visibleStart, visibleEnd) + 1;
-                break;
-
-            default: // DAY
-                totalUnits = ChronoUnit.DAYS.between(visibleStart, visibleEnd) + 1;
-        }
-
-        // Ajustement de la largeur totale
-        int availableWidth = getWidth() - leftMargin - 50;
+        int availableWidth = getWidth() - LEFT_MARGIN - RIGHT_PADDING;
         double totalWidth = totalUnits * unitWidth;
 
         if (totalWidth < availableWidth) {
             unitWidth = (double) availableWidth / totalUnits;
         }
 
-        // --- Fond alterné pour améliorer la lisibilité ---
-        if (scaleType == ScaleType.DAY) {
-            // Une semaine sur deux
-            for (int i = 0; i < totalUnits; i += 14) {
-                int x = leftMargin + (int)Math.round(i * unitWidth);
-                g2.setColor(new Color(200, 200, 200, 100));
-                g2.fillRect(x, yOffset - 30, (int)Math.round(unitWidth * 7), getHeight());
-            }
-        } else if (scaleType == ScaleType.YEAR) {
-            // Une année sur deux
-            for (int i = 0; i < totalUnits; i += 2) {
-                int x = leftMargin + (int)Math.round(i * unitWidth);
-                g2.setColor(new Color(200, 200, 200, 100));
-                g2.fillRect(x, yOffset - 30, (int)Math.round(unitWidth), getHeight());
-            }
+        return unitWidth;
+    }
+
+    private void drawAlternateBackground(Graphics2D g2, long totalUnits, double unitWidth) {
+        g2.setColor(ALTERNATE_BG);
+        
+        int step = getAlternateStep();
+        int width = getAlternateWidth();
+
+        for (int i = 0; i < totalUnits; i += step * 2) {
+            int x = LEFT_MARGIN + (int) Math.round(i * unitWidth);
+            int w = (int) Math.round(unitWidth * width);
+            g2.fillRect(x, Y_OFFSET - HEADER_HEIGHT, w, getHeight());
         }
+    }
 
-        // --- Axe du temps ---
-        LocalDate cursor = visibleStart;
-        WeekFields wf = WeekFields.of(Locale.getDefault());
-        g2.setFont(new Font("Arial", Font.PLAIN, 12));
+    private int getAlternateStep() {
+        switch (scaleType) {
+            case DAY:   return 7;
+            case WEEK:  return 5;
+            case MONTH: return 1;
+            case YEAR:  return 1;
+            default:    return 1;
+        }
+    }
 
-        for (int i = 0; i <= totalUnits; i++) {
-            int x = leftMargin + (int)Math.round(i * unitWidth);
-            String label = "";
+    private int getAlternateWidth() {
+        switch (scaleType) {
+            case DAY:   return 7;
+            case WEEK:  return 5;
+            case MONTH: return 1;
+            case YEAR:  return 1;
+            default:    return 1;
+        }
+    }
 
-            // Déterminer quoi afficher
-            switch (scaleType) {
-                case YEAR:
-                    label = String.valueOf(cursor.getYear());
-                    break;
+    private void drawTimeAxis(Graphics2D g2, DateRange range, long totalUnits, double unitWidth) {
+        LocalDate cursor = range.start;
+        WeekFields weekFields = WeekFields.of(Locale.getDefault());
+        g2.setFont(new Font("Arial", Font.PLAIN, 11));
 
-                case MONTH:
-                    label = cursor.getMonth().toString().substring(0,3) + " " + cursor.getYear();
-                    break;
+        for (int i = 0; i < totalUnits; i++) {
+            int x = LEFT_MARGIN + (int) Math.round(i * unitWidth);
+            String label = getTimeLabel(cursor, range.end, weekFields);
 
-                case WEEK:
-                    label = "S" + cursor.get(wf.weekOfWeekBasedYear());
-                    break;
-
-                default: // DAY
-                    // Afficher uniquement les lundis
-                    // Format sans année : dd/MM
-                    if (cursor.getDayOfWeek().getValue() == 1)
-                        label = cursor.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM"));
-                        //System.out.print(cursor.getDayOfWeek().getValue());
-            }
-
-            // Éviter les collisions de texte
             if (!label.isEmpty()) {
-                g2.setColor(Color.BLACK);
-                g2.drawString(label, x - 20, yOffset - 40);
+                g2.setColor(TEXT_COLOR);
+                int labelX = (scaleType == ScaleType.DAY) ? x + 10 : x + 2;
+                g2.drawString(label, labelX, Y_OFFSET - HEADER_HEIGHT + 15);
             }
 
-            // Ligne verticale
-            g2.setColor(new Color(200,200,200));
-            g2.drawLine(x, yOffset - 30, x, getHeight());
+            g2.setColor(GRID_COLOR);
+            g2.drawLine(x, Y_OFFSET - HEADER_HEIGHT + 20, x, getHeight());
 
-            // Avancer le curseur
-            switch (scaleType) {
-                case YEAR: cursor = cursor.plusYears(1); break;
-                case MONTH: cursor = cursor.plusMonths(1); break;
-                case WEEK: cursor = cursor.plusWeeks(1); break;
-                default: cursor = cursor.plusDays(1);
+            cursor = advanceCursor(cursor);
+        }
+    }
+
+    private String getTimeLabel(LocalDate cursor, LocalDate visibleEnd, WeekFields weekFields) {
+        switch (scaleType) {
+            case YEAR:
+                return cursor.getYear() <= visibleEnd.getYear() 
+                    ? String.valueOf(cursor.getYear()) 
+                    : "";
+            
+            case MONTH:
+                if (cursor.withDayOfMonth(1).isAfter(visibleEnd.withDayOfMonth(1))) {
+                    return "";
+                }
+                return cursor.getMonth().getDisplayName(TextStyle.SHORT, Locale.FRENCH) 
+                    + " " + cursor.getYear();
+            
+            case WEEK:
+                if (cursor.isAfter(visibleEnd)) return "";
+                int weekNum = cursor.get(weekFields.weekOfWeekBasedYear());
+                return "S" + weekNum;
+            
+            default:
+                return cursor.format(DAY_FORMATTER);
+        }
+    }
+
+    private LocalDate advanceCursor(LocalDate cursor) {
+        switch (scaleType) {
+            case YEAR:  return cursor.plusYears(1);
+            case MONTH: return cursor.plusMonths(1);
+            case WEEK:  return cursor.plusWeeks(1);
+            default:    return cursor.plusDays(1);
+        }
+    }
+
+    private void drawTasks(Graphics2D g2, DateRange visibleRange, double unitWidth) {
+        int y = Y_OFFSET;
+
+        for (Task task : tasks) {
+            if (isTaskVisible(task, visibleRange)) {
+                drawTask(g2, task, visibleRange, unitWidth, y);
             }
+            y += TASK_HEIGHT + TASK_SPACING;
+        }
+    }
+
+    private boolean isTaskVisible(Task task, DateRange range) {
+        LocalDate end = task.getStartDate().plusDays(task.getDuration());
+        return !end.isBefore(range.start) && !task.getStartDate().isAfter(range.end);
+    }
+
+    private void drawTask(Graphics2D g2, Task task, DateRange range, double unitWidth, int y) {
+        LocalDate start = task.getStartDate();
+        LocalDate end = start.plusDays(task.getDuration());
+
+        TaskPosition position = calculateTaskPosition(start, end, range, unitWidth);
+
+        double visibleLeftX = LEFT_MARGIN;
+        double visibleRightX = LEFT_MARGIN + calculateTotalUnits(range) * unitWidth;
+        
+        double taskX = position.x;
+        double taskWidth = position.width;
+        
+        if (taskX + taskWidth > visibleRightX) {
+            taskWidth = visibleRightX - taskX;
+        }
+        
+        if (taskX < visibleLeftX) {
+            taskWidth -= (visibleLeftX - taskX);
+            taskX = visibleLeftX;
+        }
+        
+        if (taskWidth < MIN_TASK_WIDTH) {
+            return;
         }
 
-        // --- Dessiner chaque tâche ---
-        int y = yOffset;
+        g2.setColor(getColorForPriority(task.getPriority()));
+        g2.fillRoundRect(
+            (int) Math.round(taskX), y,
+            (int) Math.round(taskWidth), TASK_HEIGHT,
+            BORDER_RADIUS, BORDER_RADIUS
+        );
 
-        for (Task t : tasks) {
-            LocalDate start = t.getStartDate();
-            LocalDate end = start.plusDays(t.getDuration());
+        g2.setColor(TASK_BORDER);
+        g2.drawRoundRect(
+            (int) Math.round(taskX), y,
+            (int) Math.round(taskWidth), TASK_HEIGHT,
+            BORDER_RADIUS, BORDER_RADIUS
+        );
 
-            // Ne pas afficher si hors zone visible
-            if (end.isBefore(visibleStart) || start.isAfter(visibleEnd))
-                continue;
+        if (taskWidth > 50) {
+            g2.setColor(Color.WHITE);
+            g2.setFont(new Font("Arial", Font.BOLD, 9));
+            
+            String duration = task.getDuration() + "j";
+            FontMetrics fm = g2.getFontMetrics();
+            int textWidth = fm.stringWidth(duration);
+            int textX = (int) Math.round(taskX + (taskWidth - textWidth) / 2);
+            
+            g2.drawString(duration, textX, y + 14);
+        }
+    }
 
-            double taskX = leftMargin;
-            double taskWidth;
+    private TaskPosition calculateTaskPosition(LocalDate start, LocalDate end, DateRange range, double unitWidth) {
+        double taskX = LEFT_MARGIN;
+        double taskWidth;
 
-            // Calcul de position selon échelle
-            switch (scaleType) {
+        switch (scaleType) {
+            case YEAR:
+                taskX += calculateYearPosition(start, range.start, unitWidth);
+                taskWidth = calculateYearWidth(start, end, unitWidth);
+                break;
 
-                case YEAR: {
-                    long yearsOffset = ChronoUnit.YEARS.between(
-                            visibleStart.withDayOfYear(1),
-                            start.withDayOfYear(1)
-                    );
+            case MONTH:
+                taskX += calculateMonthPosition(start, range.start, unitWidth);
+                taskWidth = calculateMonthWidth(start, end, unitWidth);
+                break;
 
-                    long daysInYear = start.lengthOfYear();
-                    long dayOffset = ChronoUnit.DAYS.between(start.withDayOfYear(1), start);
+            case WEEK:
+                taskX += calculateWeekPosition(start, range.start, unitWidth);
+                taskWidth = calculateWeekWidth(start, end, unitWidth);
+                break;
 
-                    double adjustedUnitWidth = Math.min(unitWidth, 200 * zoomFactor);
-
-                    taskX += (yearsOffset + (double) dayOffset / daysInYear) * adjustedUnitWidth;
-                    taskWidth = (ChronoUnit.DAYS.between(start,end) / (double)daysInYear) * adjustedUnitWidth;
-                    break;
-                }
-
-                case MONTH: {
-                    long monthsOffset = ChronoUnit.MONTHS.between(
-                            LocalDate.of(visibleStart.getYear(), visibleStart.getMonth(), 1),
-                            LocalDate.of(start.getYear(), start.getMonth(), 1)
-                    );
-
-                    long daysInMonth = start.lengthOfMonth();
-                    long dayOffset = ChronoUnit.DAYS.between(start.withDayOfMonth(1), start);
-
-                    taskX += (monthsOffset + (double) dayOffset / daysInMonth) * unitWidth;
-                    taskWidth = (ChronoUnit.DAYS.between(start,end) / (double) daysInMonth) * unitWidth;
-                    break;
-                }
-
-                case WEEK: {
-                    long weeksOffset = ChronoUnit.WEEKS.between(visibleStart, start);
-                    long dayOffset = ChronoUnit.DAYS.between(visibleStart.plusWeeks(weeksOffset), start);
-
-                    taskX += (weeksOffset + (double) dayOffset / 7.0) * unitWidth;
-                    taskWidth = (ChronoUnit.DAYS.between(start,end) / 7.0) * unitWidth;
-                    break;
-                }
-
-                default: { // DAY
-                    long daysOffset = ChronoUnit.DAYS.between(visibleStart, start);
-                    taskX += daysOffset * unitWidth;
-                    taskWidth = ChronoUnit.DAYS.between(start,end) * unitWidth;
-                }
-            }
-
-            // Largeur minimale
-            taskWidth = Math.max(3, taskWidth);
-
-            // Dessin du rectangle de tâche
-            g2.setColor(getColorForPriority(t.getPriority()));
-            g2.fillRoundRect((int)Math.round(taskX), y, (int)Math.round(taskWidth), taskHeight,6,6);
-
-            g2.setColor(Color.DARK_GRAY);
-            g2.drawRoundRect((int)Math.round(taskX), y, (int)Math.round(taskWidth), taskHeight,6,6);
-
-            // Nom de la tâche
-            g2.setColor(Color.BLACK);
-            g2.drawString(t.getName(), 10, y + 16);
-
-            y += taskHeight + taskSpacing;
+            default:
+                long daysOffset = ChronoUnit.DAYS.between(range.start, start);
+                taskX += daysOffset * unitWidth;
+                taskWidth = ChronoUnit.DAYS.between(start, end) * unitWidth;
         }
 
-        // Ajuster la taille du panel
-        int panelWidth = leftMargin + (int)Math.round(totalUnits * unitWidth) + 50;
-        int panelHeight = y + 50;
+        taskWidth = Math.max(MIN_TASK_WIDTH, taskWidth);
+        return new TaskPosition((int) Math.round(taskX), (int) Math.round(taskWidth));
+    }
+
+    private double calculateYearPosition(LocalDate start, LocalDate visibleStart, double unitWidth) {
+        long yearsOffset = ChronoUnit.YEARS.between(
+            visibleStart.withDayOfYear(1),
+            start.withDayOfYear(1)
+        );
+        
+        long daysInYear = start.lengthOfYear();
+        long dayOffset = ChronoUnit.DAYS.between(start.withDayOfYear(1), start);
+        double adjustedWidth = Math.min(unitWidth, 200 * zoomFactor);
+        
+        return (yearsOffset + (double) dayOffset / daysInYear) * adjustedWidth;
+    }
+
+    private double calculateYearWidth(LocalDate start, LocalDate end, double unitWidth) {
+        long daysInYear = start.lengthOfYear();
+        double adjustedWidth = Math.min(unitWidth, 200 * zoomFactor);
+        return (ChronoUnit.DAYS.between(start, end) / (double) daysInYear) * adjustedWidth;
+    }
+
+    private double calculateMonthPosition(LocalDate start, LocalDate visibleStart, double unitWidth) {
+        long monthsOffset = ChronoUnit.MONTHS.between(
+            visibleStart.withDayOfMonth(1),
+            start.withDayOfMonth(1)
+        );
+        
+        long daysInMonth = start.lengthOfMonth();
+        long dayOffset = start.getDayOfMonth() - 1;
+        
+        return (monthsOffset + (double) dayOffset / daysInMonth) * unitWidth;
+    }
+
+    private double calculateMonthWidth(LocalDate start, LocalDate end, double unitWidth) {
+        long daysInMonth = start.lengthOfMonth();
+        return (ChronoUnit.DAYS.between(start, end) / (double) daysInMonth) * unitWidth;
+    }
+
+    private double calculateWeekPosition(LocalDate start, LocalDate visibleStart, double unitWidth) {
+        long weeksOffset = ChronoUnit.WEEKS.between(visibleStart, start);
+        long dayOffset = ChronoUnit.DAYS.between(visibleStart.plusWeeks(weeksOffset), start);
+        return (weeksOffset + dayOffset / 7.0) * unitWidth;
+    }
+
+    private double calculateWeekWidth(LocalDate start, LocalDate end, double unitWidth) {
+        return (ChronoUnit.DAYS.between(start, end) / 7.0) * unitWidth;
+    }
+
+    private void updatePanelSize(long totalUnits, double unitWidth) {
+        int panelWidth = LEFT_MARGIN + (int) Math.round(totalUnits * unitWidth) + RIGHT_PADDING;
+        int panelHeight = Y_OFFSET + (tasks.size() * (TASK_HEIGHT + TASK_SPACING)) + 50;
+        
         setPreferredSize(new Dimension(panelWidth, panelHeight));
         revalidate();
+    }
+
+    // CLASSES INTERNES
+    private static class DateRange {
+        final LocalDate start;
+        final LocalDate end;
+
+        DateRange(LocalDate start, LocalDate end) {
+            this.start = start;
+            this.end = end;
+        }
+    }
+
+    private static class TaskPosition {
+        final int x;
+        final int width;
+
+        TaskPosition(int x, int width) {
+            this.x = x;
+            this.width = width;
+        }
+    }
+
+    // ========== PANNEAU DES NOMS (CLASSE SÉPARÉE) ==========
+    
+    /**
+     * Panneau qui affiche uniquement les noms des tâches (fixe, ne scroll pas horizontal)
+     */
+    public static class TaskNamesPanel extends JPanel {
+        private List<Task> tasks;
+        private static final int TASK_HEIGHT = 22;
+        private static final int TASK_SPACING = 14;
+        private static final int Y_OFFSET = 80;
+        private static final int NAMES_WIDTH = 150;
+
+        public TaskNamesPanel(List<Task> tasks) {
+            this.tasks = tasks;
+            setBackground(Color.WHITE);
+            setPreferredSize(new Dimension(NAMES_WIDTH, 500));
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g;
+            
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+            // Dessiner le fond d'en-tête
+            g2.setColor(new Color(240, 240, 240));
+            g2.fillRect(0, 0, getWidth(), Y_OFFSET);
+            
+            // Bordure
+            g2.setColor(Color.LIGHT_GRAY);
+            g2.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
+            g2.drawLine(0, Y_OFFSET, getWidth(), Y_OFFSET);
+
+            // Afficher les noms des tâches
+            g2.setColor(Color.BLACK);
+            g2.setFont(new Font("Arial", Font.PLAIN, 11));
+            
+            int y = Y_OFFSET;
+            for (Task task : tasks) {
+                g2.drawString(task.getName(), 10, y + 16);
+                y += TASK_HEIGHT + TASK_SPACING;
+            }
+
+            // Mettre à jour la hauteur du panneau
+            int panelHeight = Y_OFFSET + (tasks.size() * (TASK_HEIGHT + TASK_SPACING)) + 50;
+            setPreferredSize(new Dimension(NAMES_WIDTH, panelHeight));
+            revalidate();
+        }
+    }
+
+    // ========== MÉTHODE UTILE POUR CRÉER LE LAYOUT COMPLET ==========
+    
+    /**
+     * Crée un JSplitPane avec les noms à gauche et le diagramme à droite
+     */
+    public static JSplitPane createGanttView(List<Task> tasks) {
+        TaskNamesPanel namesPanel = new TaskNamesPanel(tasks);
+        GanttPanelZoom ganttPanel = new GanttPanelZoom(tasks);
+        
+        JScrollPane ganttScrollPane = new JScrollPane(ganttPanel);
+        ganttScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        ganttScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        
+        // Synchroniser le scroll vertical entre les deux panneaux
+        ganttScrollPane.getVerticalScrollBar().addAdjustmentListener(e -> {
+            // Quand on scroll le diagramme, rien ne change (les noms restent fixes)
+        });
+        
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, namesPanel, ganttScrollPane);
+        splitPane.setDividerLocation(150);
+        splitPane.setOneTouchExpandable(true);
+        
+        return splitPane;
     }
 }
