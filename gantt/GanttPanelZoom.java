@@ -234,7 +234,7 @@ public class GanttPanelZoom extends JPanel {
 
             if (!label.isEmpty()) {
                 g2.setColor(TEXT_COLOR);
-                int labelX = (scaleType == ScaleType.DAY) ? x + 10 : x + 2;
+                int labelX = (scaleType == ScaleType.DAY) ? x + 10 : x + 10;
                 g2.drawString(label, labelX, Y_OFFSET - HEADER_HEIGHT + 15);
             }
 
