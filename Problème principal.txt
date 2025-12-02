@@ -1,0 +1,33 @@
+
+Problème principal :
+	. Les taches vont jusqu'au bout de la fenêtre (elle devrait s'arrêter un peu avant) ✅
+	. ajout de ligne horizontal pour bien voir les taches et les noms des taches
+	. Bien définir les zone a griser surtout days et week les semaine de sont pas bonne ou sinon c’est le début qui est compromis
+	
+	
+
+Fonctionnalité a ajouter :
+	. Ajouter la base de donner et l'implémenter dans le coder	
+	. ajouter la barre du jour ou on est dans le temps (barre vertical)
+	. Redéfinir les frise de temps (
+			days = 3 semaine visible plus 2 ou 4 sur les coter
+			week = 6  ou 8 semaine visible plus 2 ou 4 sur les coter
+			month = 6 mois plus .. sur les coter
+			years = 2 ans plus 2 sur les coter)
+	. Bien définir les temps afficher (days surtout) et bien les délimiter et ajouter*
+la frise de temps sur days
+	. Faire en sort que au début le gant soit centrer sur la date d'aujourd’hui (barre vertical) scrollable sur les coter (days afficher sur 3 semaine centrer sur la date d'aujourd’hui et scrollable sur deux semaine un de chaque coter )
+	
+	
+	
+fonctionnaliser supplémentaire : 
+	. glisser déposer des taches :
+		. Déplacer une tâche dans le temps avec la souris
+		. Ajuster la durée en tirant les bords gauche/droit
+		. Snap automatique des tache (jour semaine etc)
+	. Zoom dynamique :
+		. mollette de souris 
+	. Export PDF/PNG
+	
+	
+	
