@@ -41,6 +41,7 @@ public class GanttPanelZoom extends JPanel {
     private static final Color ALTERNATE_BG = new Color(220, 220, 220, 200);
     private static final Color TASK_BORDER = Color.DARK_GRAY;
     private static final Color TEXT_COLOR = Color.BLACK;
+    private static final Color HORIZONTAL_GRID = new Color(230, 230, 230);
 
     // FORMATTEURS DE DATE
     private static final DateTimeFormatter DAY_FORMATTER = DateTimeFormatter.ofPattern("dd/MM");
@@ -173,6 +174,7 @@ public class GanttPanelZoom extends JPanel {
 
         drawAlternateBackground(g2, totalUnits, unitWidth);
         drawTimeAxis(g2, visibleRange, totalUnits, unitWidth);
+        drawHorizontalGridLines(g2);
         drawTasks(g2, visibleRange, unitWidth);
 
         updatePanelSize(totalUnits, unitWidth);
@@ -238,11 +240,25 @@ public class GanttPanelZoom extends JPanel {
                 g2.drawString(label, labelX, Y_OFFSET - HEADER_HEIGHT + 15);
             }
 
+            // Lignes verticales entre les dates (sur tout le diagramme)
             g2.setColor(GRID_COLOR);
-            g2.drawLine(x, Y_OFFSET - HEADER_HEIGHT + 20, x, getHeight());
+            g2.drawLine(x, Y_OFFSET - HEADER_HEIGHT, x, getHeight());
 
             cursor = advanceCursor(cursor);
         }
+        
+        // Cadre autour de la zone des dates
+        g2.setColor(GRID_COLOR);
+        g2.setStroke(new BasicStroke(1));
+        // Ligne du haut
+        g2.drawLine(LEFT_MARGIN, Y_OFFSET - HEADER_HEIGHT, getWidth(), Y_OFFSET - HEADER_HEIGHT);
+        // Ligne du bas
+        g2.drawLine(0, Y_OFFSET - HEADER_HEIGHT + TASK_HEIGHT + 10, getWidth(), Y_OFFSET - HEADER_HEIGHT + TASK_HEIGHT + 10);
+        //g2.drawLine(LEFT_MARGIN, Y_OFFSET - 5 , getWidth(), Y_OFFSET  - 10);
+        // Ligne de gauche
+        g2.drawLine(LEFT_MARGIN, Y_OFFSET - HEADER_HEIGHT, LEFT_MARGIN, Y_OFFSET);
+        // Ligne de droite
+        g2.drawLine(getWidth() - RIGHT_PADDING, Y_OFFSET - HEADER_HEIGHT, getWidth() - RIGHT_PADDING, Y_OFFSET);
     }
 
     private String getTimeLabel(LocalDate cursor, LocalDate visibleEnd, WeekFields weekFields) {
@@ -277,6 +293,36 @@ public class GanttPanelZoom extends JPanel {
             default:    return cursor.plusDays(1);
         }
     }
+
+private void drawHorizontalGridLines(Graphics2D g2) {
+    int y = Y_OFFSET;
+
+    for (int i = 0; i < tasks.size(); i++) {
+
+        // --- Alternance des couleurs de fond ---
+        if (i % 2 == 1) {
+            g2.setColor(ALTERNATE_BG);
+            g2.fillRect(0, y - 5, getWidth(), TASK_HEIGHT + 10);
+            // --- Lignes de séparation ---
+            g2.setColor(GRID_COLOR);
+
+            int top = y - 5;                  // haut du rectangle
+            int bottom = y + TASK_HEIGHT + 5; // bas du rectangle
+
+            // ligne du haut
+            g2.drawLine(0, top, getWidth(), top);
+
+            // ligne du bas
+            g2.drawLine(0, bottom, getWidth(), bottom);
+        }
+
+
+        // next task
+        y += TASK_HEIGHT + TASK_SPACING;
+    }
+}
+
+
 
     private void drawTasks(Graphics2D g2, DateRange visibleRange, double unitWidth) {
         int y = Y_OFFSET;
