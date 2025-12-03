@@ -29,10 +29,11 @@ public class GanttPanelZoom extends JPanel {
     // CONSTANTES DE MISE EN PAGE
     private static final int TASK_HEIGHT = 22;
     private static final int TASK_SPACING = 14;
-    private static final int Y_OFFSET = 80;
-    private static final int LEFT_MARGIN = 0; // Pas de marge à gauche (les noms sont ailleurs)
-    private static final int RIGHT_PADDING = 50;
-    private static final int HEADER_HEIGHT = 40;
+    private static final int HEADER_HEIGHT = 36;
+    private static final int Y_OFFSET = 36;
+    private static final int LEFT_MARGIN = 0;
+    private static final int RIGHT_PADDING = 0;
+    //private static final int HEADER_HEIGHT = 50;
     private static final int MIN_TASK_WIDTH = 3;
     private static final int BORDER_RADIUS = 6;
 
@@ -228,7 +229,7 @@ public class GanttPanelZoom extends JPanel {
     private void drawTimeAxis(Graphics2D g2, DateRange range, long totalUnits, double unitWidth) {
         LocalDate cursor = range.start;
         WeekFields weekFields = WeekFields.of(Locale.getDefault());
-        g2.setFont(new Font("Arial", Font.PLAIN, 11));
+        g2.setFont(new Font("Arial", Font.PLAIN, 10));
 
         for (int i = 0; i < totalUnits; i++) {
             int x = LEFT_MARGIN + (int) Math.round(i * unitWidth);
@@ -237,12 +238,12 @@ public class GanttPanelZoom extends JPanel {
             if (!label.isEmpty()) {
                 g2.setColor(TEXT_COLOR);
                 int labelX = (scaleType == ScaleType.DAY) ? x + 10 : x + 10;
-                g2.drawString(label, labelX, Y_OFFSET - HEADER_HEIGHT + 15);
+                g2.drawString(label, labelX, 24);
             }
 
-            // Lignes verticales entre les dates (sur tout le diagramme)
+            // Lignes verticales entre les dates
             g2.setColor(GRID_COLOR);
-            g2.drawLine(x, Y_OFFSET - HEADER_HEIGHT, x, getHeight());
+            g2.drawLine(x, 0, x, getHeight());
 
             cursor = advanceCursor(cursor);
         }
@@ -250,15 +251,8 @@ public class GanttPanelZoom extends JPanel {
         // Cadre autour de la zone des dates
         g2.setColor(GRID_COLOR);
         g2.setStroke(new BasicStroke(1));
-        // Ligne du haut
-        g2.drawLine(LEFT_MARGIN, Y_OFFSET - HEADER_HEIGHT, getWidth(), Y_OFFSET - HEADER_HEIGHT);
-        // Ligne du bas
-        g2.drawLine(0, Y_OFFSET - HEADER_HEIGHT + TASK_HEIGHT + 10, getWidth(), Y_OFFSET - HEADER_HEIGHT + TASK_HEIGHT + 10);
-        //g2.drawLine(LEFT_MARGIN, Y_OFFSET - 5 , getWidth(), Y_OFFSET  - 10);
-        // Ligne de gauche
-        g2.drawLine(LEFT_MARGIN, Y_OFFSET - HEADER_HEIGHT, LEFT_MARGIN, Y_OFFSET);
-        // Ligne de droite
-        g2.drawLine(getWidth() - RIGHT_PADDING, Y_OFFSET - HEADER_HEIGHT, getWidth() - RIGHT_PADDING, Y_OFFSET);
+        // Ligne du bas (trait de soulignement)
+        g2.drawLine(0, Y_OFFSET, getWidth(), Y_OFFSET);
     }
 
     private String getTimeLabel(LocalDate cursor, LocalDate visibleEnd, WeekFields weekFields) {
@@ -296,40 +290,35 @@ public class GanttPanelZoom extends JPanel {
 
 private void drawHorizontalGridLines(Graphics2D g2) {
     int y = Y_OFFSET;
+    int panelHeight = getHeight();
+    int count = 0;
 
-    for (int i = 0; i < tasks.size(); i++) {
-
-        // --- Alternance des couleurs de fond ---
-        if (i % 2 == 1) {
+    // Dessiner les lignes alternées sur toute la hauteur de la fenêtre
+    while (y < panelHeight) {
+        //if (count % 2 == 0) {
             g2.setColor(ALTERNATE_BG);
-            g2.fillRect(0, y - 5, getWidth(), TASK_HEIGHT + 10);
-            // --- Lignes de séparation ---
+            int height = Math.min(TASK_HEIGHT + TASK_SPACING, panelHeight - y);
+            //g2.fillRect(0, y, getWidth(), height);
             g2.setColor(GRID_COLOR);
 
-            int top = y - 5;                  // haut du rectangle
-            int bottom = y + TASK_HEIGHT + 5; // bas du rectangle
+            //g2.drawLine(0, y, getWidth(), y);
+            //g2.drawLine(0, y + 15 , getWidth(), y + 15);
+            //g2.drawLine(0, y + height, getWidth(), y + height);
+        //}
 
-            // ligne du haut
-            g2.drawLine(0, top, getWidth(), top);
-
-            // ligne du bas
-            g2.drawLine(0, bottom, getWidth(), bottom);
-        }
-
-
-        // next task
         y += TASK_HEIGHT + TASK_SPACING;
+        count++;
     }
 }
-
-
 
     private void drawTasks(Graphics2D g2, DateRange visibleRange, double unitWidth) {
         int y = Y_OFFSET;
 
         for (Task task : tasks) {
             if (isTaskVisible(task, visibleRange)) {
-                drawTask(g2, task, visibleRange, unitWidth, y);
+                // Centrer verticalement la tâche dans l'espace disponible
+                int taskY = y + (TASK_SPACING / 2) - (TASK_HEIGHT / 2);
+                drawTask(g2, task, visibleRange, unitWidth, taskY + 10);
             }
             y += TASK_HEIGHT + TASK_SPACING;
         }
@@ -502,52 +491,76 @@ private void drawHorizontalGridLines(Graphics2D g2) {
     /**
      * Panneau qui affiche uniquement les noms des tâches (fixe, ne scroll pas horizontal)
      */
-    public static class TaskNamesPanel extends JPanel {
-        private List<Task> tasks;
-        private static final int TASK_HEIGHT = 22;
-        private static final int TASK_SPACING = 14;
-        private static final int Y_OFFSET = 80;
-        private static final int NAMES_WIDTH = 150;
+public static class TaskNamesPanel extends JPanel {
+    private List<Task> tasks;
+    private static final int TASK_HEIGHT = 22;
+    private static final int TASK_SPACING = 14;
+    private static final int HEADER_HEIGHT = 36;
+    private static final int Y_OFFSET = 36;
+    private static final int NAMES_WIDTH = 150;
+    private static final Color ALTERNATE_BG = new Color(220, 220, 220, 200);
+    private static final Color GRID_COLOR = new Color(200, 200, 200);
 
-        public TaskNamesPanel(List<Task> tasks) {
-            this.tasks = tasks;
-            setBackground(Color.WHITE);
-            setPreferredSize(new Dimension(NAMES_WIDTH, 500));
-        }
+    public TaskNamesPanel(List<Task> tasks) {
+        this.tasks = tasks;
+        setBackground(Color.WHITE);
+        setPreferredSize(new Dimension(NAMES_WIDTH, 500));
+    }
 
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            Graphics2D g2 = (Graphics2D) g;
-            
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D) g;
+        
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-            // Dessiner le fond d'en-tête
-            g2.setColor(new Color(240, 240, 240));
-            g2.fillRect(0, 0, getWidth(), Y_OFFSET);
-            
-            // Bordure
-            g2.setColor(Color.LIGHT_GRAY);
-            g2.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
-            g2.drawLine(0, Y_OFFSET, getWidth(), Y_OFFSET);
+        // Dessiner le fond d'en-tête
+        g2.setColor(new Color(240, 240, 240));
+        g2.fillRect(0, 0, getWidth(), HEADER_HEIGHT);
+        
+        // Bordure et trait de soulignement
+        g2.setColor(GRID_COLOR);
+        g2.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
+        g2.drawLine(0, HEADER_HEIGHT, getWidth(), HEADER_HEIGHT);
 
-            // Afficher les noms des tâches
-            g2.setColor(Color.BLACK);
-            g2.setFont(new Font("Arial", Font.PLAIN, 11));
-            
-            int y = Y_OFFSET;
-            for (Task task : tasks) {
-                g2.drawString(task.getName(), 10, y + 16);
-                y += TASK_HEIGHT + TASK_SPACING;
+        // Dessiner les lignes alternées et les noms des tâches
+        g2.setColor(Color.BLACK);
+        g2.setFont(new Font("Arial", Font.PLAIN, 11));
+        
+        int y = Y_OFFSET;
+        int panelHeight = getHeight();
+        int count = 0;
+
+        // Dessiner les lignes alternées sur toute la hauteur
+        while (y < panelHeight) {
+            //if (count % 2 == 0) {
+                g2.setColor(ALTERNATE_BG);
+                int height = Math.min(TASK_HEIGHT + TASK_SPACING, panelHeight - y);
+                //g2.fillRect(0, y, getWidth(), height);
+                g2.setColor(GRID_COLOR);
+
+                //g2.drawLine(0, y + 15 , getWidth(), y + 15);
+                //g2.drawLine(0, y + height, getWidth(), y + height);
+            //}
+
+            // Afficher le nom de la tâche si elle existe
+            if (count < tasks.size()) {
+                g2.setColor(Color.BLACK);
+                int taskY = y + (TASK_SPACING / 2);
+                g2.drawString(tasks.get(count).getName(), 10, taskY + 11);
             }
 
-            // Mettre à jour la hauteur du panneau
-            int panelHeight = Y_OFFSET + (tasks.size() * (TASK_HEIGHT + TASK_SPACING)) + 50;
-            setPreferredSize(new Dimension(NAMES_WIDTH, panelHeight));
-            revalidate();
+            y += TASK_HEIGHT + TASK_SPACING;
+            count++;
         }
+
+        // Mettre à jour la hauteur du panneau
+        int newPanelHeight = Y_OFFSET + (tasks.size() * (TASK_HEIGHT + TASK_SPACING)) + 50;
+        setPreferredSize(new Dimension(NAMES_WIDTH, newPanelHeight));
+        revalidate();
     }
+}
 
     // ========== MÉTHODE UTILE POUR CRÉER LE LAYOUT COMPLET ==========
     
@@ -562,14 +575,9 @@ private void drawHorizontalGridLines(Graphics2D g2) {
         ganttScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         ganttScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         
-        // Synchroniser le scroll vertical entre les deux panneaux
-        ganttScrollPane.getVerticalScrollBar().addAdjustmentListener(e -> {
-            // Quand on scroll le diagramme, rien ne change (les noms restent fixes)
-        });
-        
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, namesPanel, ganttScrollPane);
         splitPane.setDividerLocation(150);
-        splitPane.setOneTouchExpandable(true);
+        splitPane.setOneTouchExpandable(false);
         
         return splitPane;
     }
