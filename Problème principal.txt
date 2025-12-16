@@ -1,15 +1,55 @@
 
 Problème principal :
-	. Les taches vont jusqu'au bout de la fenêtre (elle devrait s'arrêter un peu avant) ✅
-	. ajout de ligne horizontal pour bien voir les taches et les noms des taches
-	. Bien définir les zone a griser surtout days et week les semaine de sont pas bonne ou sinon c’est le début qui est compromis
-	
-	
+	Fait : 
+		. Les taches vont jusqu'au bout de la fenêtre (elle devrait s'arrêter un peu avant) ✅
+		. ajout de ligne horizontal pour bien voir les taches et les noms des taches ✅
+		. Bien aligner les noms des tache et les taches ✅
+		. voir pour enlever les mode pleine ecran ✅
+		. Augmenter la taille du gantt en hauteur (coller au header zoom) ✅
+		. enlever le systeme de zoom en temps reel (slider) ✅ 
+	Enlever :
+		. Changer les case griser horizotal (les inverser) et les faire descendre jusqu'a la taille de la fenetre ❌ (tros diformation a lecran je les enlever)
+	A faire :
+		. Enlever les taches non visible 
+		. les noms des tache scroll en meme temps que le graphique 
+		. Responsive sur les dates ? 
+		. Bien définir les zone a griser surtout days et week les semaine de sont pas bonne ou sinon c’est le début qui est compromis
+		. refaire larborencence :
+
+				├── core/                           // Cœur du système Gantt (API + logique métier)
+				│   ├── GanttEngine.java            // Moteur principal : calcule les plages de dates,
+				│   │                                // les positions des tâches et les unités de temps
+				│   │
+				│   ├── GanttConfig.java            // Configuration du moteur (zoom, échelle,
+				│   │                                // options futures sans casser l’API)
+				│   │
+				│   └── GanttScale.java             // Enum des échelles de temps (DAY, WEEK, MONTH, YEAR)
+				│
+				├── persistence/                    // Accès aux données (base de données)
+				│   ├── Task.java                   // Entité représentant une tâche telle qu’elle est
+				│   │                                // stockée en base (dates, durée, priorité, nom)
+				│   │
+				│   └── TaskRepository.java         // Interface / classe responsable de récupérer
+				│                                    // les tâches depuis la DB (SQL, ORM, etc.)
+				│
+				├── ui/                             // Couche interface utilisateur (Swing ici)
+				│   ├── GanttPanel.java             // Panneau Swing qui dessine le diagramme Gantt
+				│   │                                // en utilisant uniquement le core (aucun SQL)
+				│   │
+				│   ├── TaskNamesPanel.java         // Panneau Swing fixe qui affiche les noms des tâches
+				│   │                                // et reste aligné verticalement avec le Gantt
+				│   │
+				│   └── GanttViewFactory.java       // Classe utilitaire qui assemble l’UI complète
+				│                                    // (JSplitPane, JScrollPane, panels)
+				│
+				└── util/                           // Outils techniques internes (non exposés)
+					└── GanttMath.java              // Méthodes de calcul (dates → pixels,
+													// unités de temps, helpers mathématiques)
 
 Fonctionnalité a ajouter :
 	. Ajouter la base de donner et l'implémenter dans le coder	
-	. ajouter la barre du jour ou on est dans le temps (barre vertical)
-	. Redéfinir les frise de temps (
+	. ajouter la barre du jour ou on en est dans le temps (barre vertical)
+	. Redéfinir les frise de temps  (
 			days = 3 semaine visible plus 2 ou 4 sur les coter
 			week = 6  ou 8 semaine visible plus 2 ou 4 sur les coter
 			month = 6 mois plus .. sur les coter
